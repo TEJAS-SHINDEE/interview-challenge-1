@@ -1,75 +1,101 @@
-import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import styled from '@emotion/styled';
+import axios from 'axios';
 import Post from './Post';
 import Container from '../common/Container';
 import useWindowWidth from '../hooks/useWindowWidth';
 
-const PostListContainer = styled.div(() => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  justifyContent: 'center',
-}));
+const CarouselContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+`;
 
-const LoadMoreButton = styled.button(() => ({
-  padding: '10px 20px',
-  backgroundColor: '#007bff',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 5,
-  cursor: 'pointer',
-  fontSize: 16,
-  marginTop: 20,
-  transition: 'background-color 0.3s ease',
-  fontWeight: 600,
+const PostListContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap; 
+  justify-content: center; /* Center posts horizontally */
+`;
 
-  '&:hover': {
-    backgroundColor: '#0056b3',
-  },
-  '&:disabled': {
-    backgroundColor: '#808080',
-    cursor: 'default',
-  },
-}));
+const LoadMoreButton = styled.button`
+  margin-top: 10px;
+  margin-bottom: 20px; 
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+`;
+
+const ShowMoreButton = styled.button`
+  margin-top: 10px;
+  margin-bottom: 20px; /* Adjust margin as needed */
+  padding: 10px 20px;
+  background-color: #28a745; 
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius:1.5rem;
+`;
 
 export default function Posts() {
   const [posts, setPosts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [visiblePosts, setVisiblePosts] = useState(6); 
+  const [hasMorePosts, setHasMorePosts] = useState(true); 
   const { isSmallerDevice } = useWindowWidth();
 
   useEffect(() => {
-    const fetchPost = async () => {
-      const { data: posts } = await axios.get('/api/v1/posts', {
-        params: { start: 0, limit: isSmallerDevice ? 5 : 10 },
-      });
-      setPosts(posts);
-    };
-
-    fetchPost();
+    fetchPostsData();
   }, [isSmallerDevice]);
 
-  const handleClick = () => {
-    setIsLoading(true);
+  const fetchPostsData = async () => {
+    try {
+      const { data: initialPostsData } = await axios.get('/api/v1/posts');
+      const { data: usersData } = await axios.get('https://jsonplaceholder.typicode.com/users');
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
+      // Combine post data with user data
+      const postsWithUsers = initialPostsData.map(post => ({
+        ...post,
+        user: usersData.find(user => user.id === post.userId)
+      }));
+
+      setPosts(postsWithUsers);
+    } catch (error) {
+      console.error('Error fetching posts or users:', error);
+    }
+  };
+
+  const handlePrevClick = () => {
+    setCurrentIndex(currentIndex => Math.max(currentIndex - 1, 0));
+  };
+
+  const handleNextClick = () => {
+    setCurrentIndex(currentIndex => Math.min(currentIndex + 1, posts.length - 1));
+  };
+
+  const handleShowMore = () => {
+    setVisiblePosts(posts.length);
+    setHasMorePosts(false); 
   };
 
   return (
     <Container>
-      <PostListContainer>
-        {posts.map(post => (
-          <Post post={post} />
-        ))}
-      </PostListContainer>
-
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <LoadMoreButton onClick={handleClick} disabled={isLoading}>
-          {!isLoading ? 'Load More' : 'Loading...'}
-        </LoadMoreButton>
-      </div>
+      <CarouselContainer>
+        <PostListContainer>
+          {posts.slice(0, visiblePosts).map(post => (
+            <Post key={post.id} post={post} />
+          ))}
+        </PostListContainer>
+      </CarouselContainer>
+      {hasMorePosts && (
+        <ShowMoreButton onClick={handleShowMore}>
+          Show More
+        </ShowMoreButton>
+      )}
     </Container>
   );
 }
